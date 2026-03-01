@@ -1,0 +1,6 @@
+infra
+docs
+infra/
+docs/
+.git
+.pytest_cache

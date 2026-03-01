@@ -1,0 +1,7 @@
+django
+djangorestframework
+djangorestframework-simplejwt
+dj-rest-auth[with_social]
+drf-spectacular
+gunicorn
+whitenoise
