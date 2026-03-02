@@ -10,22 +10,17 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 
-from accounts.views import UserViewSet
 from catalog.views import ProductCategoryViewSet, ProductViewSet
-from commerce.views import QuoteViewSet, QuoteItemViewSet, OrderViewSet, OrderItemViewSet, PaymentViewSet
+from commerce.views import QuoteViewSet, OrderViewSet, PaymentViewSet
 from .router_constants import RoutePrefix
 
 router = DefaultRouter()
 
-router.register(RoutePrefix.USERS, UserViewSet, basename=RoutePrefix.USERS)
 
 router.register(RoutePrefix.PRODUCT_CATEGORIES, ProductCategoryViewSet, basename=RoutePrefix.PRODUCT_CATEGORIES)
 router.register(RoutePrefix.PRODUCTS, ProductViewSet, basename=RoutePrefix.PRODUCTS)
-
 router.register(RoutePrefix.QUOTES, QuoteViewSet, basename=RoutePrefix.QUOTES)
-router.register(RoutePrefix.QUOTE_ITEMS, QuoteItemViewSet, basename=RoutePrefix.QUOTE_ITEMS)
 router.register(RoutePrefix.ORDERS, OrderViewSet, basename=RoutePrefix.ORDERS)
-router.register(RoutePrefix.ORDER_ITEMS, OrderItemViewSet, basename=RoutePrefix.ORDER_ITEMS)
 router.register(RoutePrefix.PAYMENTS, PaymentViewSet, basename=RoutePrefix.PAYMENTS)
 
 

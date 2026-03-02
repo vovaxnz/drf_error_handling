@@ -1,7 +1,9 @@
 # commerce/admin.py
 from django.contrib import admin
 
-from .models import Quote, QuoteItem, Order, OrderItem, Payment
+from .models.quotes import Quote, QuoteItem
+from .models.orders import Order, OrderItem
+from .models.payments import Payment
 
 
 class QuoteItemInline(admin.TabularInline):

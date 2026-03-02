@@ -5,3 +5,4 @@ dj-rest-auth[with_social]
 drf-spectacular
 gunicorn
 whitenoise
+django-fsm

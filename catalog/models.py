@@ -31,6 +31,9 @@ class ProductCategory(models.Model):
             return f"{self.parent.name} / {self.name}"
         return self.name
 
+
+
+
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -44,7 +47,7 @@ class Product(models.Model):
     image_url = models.URLField(blank=True, default="")
 
     price_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
-    price_currency = models.CharField(max_length=3, default="USD")
+    price_currency = models.CharField(max_length=3, default="USD", editable=False)
 
     attributes = models.JSONField(default=dict, blank=True)  # color/material/dimensions, etc.
     embedding_ref = models.CharField(
