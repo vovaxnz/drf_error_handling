@@ -4,7 +4,7 @@ from rest_framework import viewsets
 from .models.quotes import Quote
 from .models.orders import Order, OrderItem
 from .models.payments import Payment
-from common.serializers import crud_schema
+from common.serializers import ErrorSerializer, crud_schema
 from .models.quotes import QuoteItem
 from .serializers import (
     QuoteSerializer,
@@ -13,7 +13,7 @@ from .serializers import (
 )
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema_view, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema_view, extend_schema
 from .models.quotes import Quote
 from .models.orders import Order
 from .models.payments import Payment
@@ -22,11 +22,11 @@ from .models.payments import Payment
     list=extend_schema(
         description=(
             "Quote aggregate root.\n\n"
-            "Invariants:\n"
-            "- Items may be added only in draft state\n"
-            "- Empty quote cannot be sent\n"
-            "- Accepted quote becomes immutable\n"
-            "- Quote currency fixed at creation\n\n"
+            "Represents a client pricing snapshot that can be reviewed and later converted to an Order.\n\n"
+            "State machine:\n"
+            "draft -> sent -> accepted\n"
+            "draft -> sent -> rejected\n\n"
+            "Only DRAFT quotes are editable. ACCEPTED quotes are immutable.\n"
         )
     )
 )
@@ -35,6 +35,21 @@ class QuoteViewSet(viewsets.ModelViewSet):
     queryset = Quote.objects.select_related("client").all().order_by("-created_at")
     serializer_class = QuoteSerializer
 
+    @extend_schema(
+        description=(
+            "Transition draft -> sent.\n\n"
+            "Invariants:\n"
+            "- Quote must be in DRAFT state.\n"
+            "- Quote must contain at least one item.\n"
+        ),
+        responses={
+            200: QuoteSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
         quote = self.get_object()
@@ -42,6 +57,24 @@ class QuoteViewSet(viewsets.ModelViewSet):
         quote.save()
         return Response(self.get_serializer(quote).data)
 
+    @extend_schema(
+        description=(
+            "Transition sent -> accepted and create Order.\n\n"
+            "Invariants:\n"
+            "- Quote must be in SENT state.\n"
+            "- idempotency_key is required.\n"
+            "- Quote must contain at least one item.\n"
+            "- Order idempotency key must be unique per client.\n"
+        ),
+        responses={
+            201: OpenApiResponse(description="Quote accepted and Order created"),
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+            409: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def accept(self, request, pk=None):
         quote = self.get_object()
@@ -67,6 +100,20 @@ class QuoteViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @extend_schema(
+        description=(
+            "Transition sent -> rejected.\n\n"
+            "Invariants:\n"
+            "- Quote must be in SENT state.\n"
+        ),
+        responses={
+            200: QuoteSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
         quote = self.get_object()
@@ -80,12 +127,11 @@ class QuoteViewSet(viewsets.ModelViewSet):
     list=extend_schema(
         description=(
             "Order aggregate root.\n\n"
-            "Invariants:\n"
-            "- Must originate from accepted Quote\n"
-            "- Idempotency key unique per client\n"
-            "- Confirm requires full payment\n"
-            "- Completed order cannot be modified\n"
-            "- Client must match Quote client\n\n"
+            "Created from an ACCEPTED Quote and represents a purchase lifecycle.\n\n"
+            "State machine:\n"
+            "created -> confirmed -> in_progress -> shipped -> completed\n\n"
+            "created/confirmed/in_progress/shipped -> cancelled\n\n"
+            "Orders enforce payment and lifecycle integrity rules.\n"
         )
     )
 )
@@ -94,6 +140,22 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.select_related("client", "quote").all().order_by("-created_at")
     serializer_class = OrderSerializer
 
+    @extend_schema(
+        description=(
+            "Transition created -> confirmed.\n\n"
+            "Invariants:\n"
+            "- Order must be in CREATED state.\n"
+            "- Order must be fully paid.\n"
+        ),
+        responses={
+            200: OrderSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+            409: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
         order = self.get_object()
@@ -102,6 +164,20 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         return Response(self.get_serializer(order).data)
 
+    @extend_schema(
+        description=(
+            "Transition confirmed -> in_progress.\n\n"
+            "Invariants:\n"
+            "- Order must be in CONFIRMED state.\n"
+        ),
+        responses={
+            200: OrderSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         order = self.get_object()
@@ -109,6 +185,20 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         return Response(self.get_serializer(order).data)
 
+    @extend_schema(
+        description=(
+            "Transition in_progress -> shipped.\n\n"
+            "Invariants:\n"
+            "- Order must be in IN_PROGRESS state.\n"
+        ),
+        responses={
+            200: OrderSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def mark_shipped(self, request, pk=None):
         order = self.get_object()
@@ -116,6 +206,21 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         return Response(self.get_serializer(order).data)
 
+    @extend_schema(
+        description=(
+            "Transition shipped -> completed.\n\n"
+            "Invariants:\n"
+            "- Order must be in SHIPPED state.\n"
+        ),
+        responses={
+            200: OrderSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+            409: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         order = self.get_object()
@@ -123,6 +228,21 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         return Response(self.get_serializer(order).data)
 
+    @extend_schema(
+        description=(
+            "Transition any -> cancelled.\n\n"
+            "Invariants:\n"
+            "- Order must not be in COMPLETED state.\n"
+        ),
+        responses={
+            200: OrderSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+            409: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         order = self.get_object()
@@ -136,11 +256,13 @@ class OrderViewSet(viewsets.ModelViewSet):
     list=extend_schema(
         description=(
             "Payment entity.\n\n"
-            "Invariants:\n"
-            "- Currency must match Order.currency\n"
-            "- Unique provider + idempotency_key\n"
-            "- Cannot modify payment in terminal state\n"
-            "- Cannot create payment for cancelled order\n\n"
+            "Represents a payment attempt for an Order.\n\n"
+            "State machine:\n"
+            "created -> pending -> completed\n"
+            "pending -> failed\n"
+            "completed -> refund_pending -> refunded\n"
+            "any -> failed\n\n"
+            "Payments enforce currency and terminal state constraints.\n"
         )
     )
 )
@@ -149,12 +271,44 @@ class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.select_related("order").all().order_by("-created_at")
     serializer_class = PaymentSerializer
 
+    @extend_schema(
+        description=(
+            "Create payment record.\n\n"
+            "Invariants:\n"
+            "- Order must not be CANCELLED.\n"
+            "- Payment currency must match order currency.\n"
+            "- Provider + idempotency_key must be unique.\n"
+        ),
+        responses={
+            200: PaymentSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def create_payment(self, request, pk=None):
         payment = self.get_object()
         payment.save()
         return Response(self.get_serializer(payment).data)
 
+    @extend_schema(
+        description=(
+            "Transition created -> pending.\n\n"
+            "Invariants:\n"
+            "- Payment must be in CREATED state.\n"
+            "- Payment must not be in terminal state.\n"
+        ),
+        responses={
+            200: PaymentSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+            409: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def process(self, request, pk=None):
         payment = self.get_object()
@@ -162,6 +316,22 @@ class PaymentViewSet(viewsets.ModelViewSet):
         payment.save()
         return Response(self.get_serializer(payment).data)
 
+    @extend_schema(
+        description=(
+            "Transition pending -> completed.\n\n"
+            "Invariants:\n"
+            "- Payment must be in PENDING state.\n"
+            "- Payment must not be in terminal state.\n"
+        ),
+        responses={
+            200: PaymentSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+            409: ErrorSerializer,
+        },
+    )
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         payment = self.get_object()
@@ -170,7 +340,23 @@ class PaymentViewSet(viewsets.ModelViewSet):
         payment.save()
         return Response(self.get_serializer(payment).data)
 
-    @action(detail=True, methods=["post"])
+    @extend_schema(
+        description=(
+            "Transition completed -> refund_pending.\n\n"
+            "Invariants:\n"
+            "- Payment must be in COMPLETED state.\n"
+            "- Payment must not be in terminal state.\n"
+        ),
+        responses={
+            200: PaymentSerializer,
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+            404: ErrorSerializer,
+            409: ErrorSerializer,
+        },
+    )
+    @action(detail=True, methods=["post"], url_path="refund")
     def request_refund(self, request, pk=None):
         payment = self.get_object()
         payment.request_refund()

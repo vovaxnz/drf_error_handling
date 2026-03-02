@@ -16,9 +16,9 @@ from .models.payments import Payment
 @extend_schema_serializer(
     description=(
         "Quote invariants:\n"
-        "- Items can be added only in draft state\n"
-        "- Cannot send empty quote\n"
-        "- Cannot modify accepted quote\n\n"
+        "- Items can be added only when Quote has status DRAFT\n"
+        "- Cannot send Quote with status DRAFT if total_amount equals 0\n"
+        "- Cannot modify Quote with status ACCEPTED\n\n"
     )
 )
 class QuoteSerializer(serializers.ModelSerializer):
@@ -64,11 +64,11 @@ class QuoteItemSerializer(serializers.ModelSerializer):
 @extend_schema_serializer(
     description=(
         "Order invariants:\n"
-        "- Created only from accepted quote\n"
+        "- Created only from Quote with status ACCEPTED\n"
         "- Idempotency key unique per client\n"
         "- Currency must match quote\n"
-        "- Cannot modify completed order\n"
-        "- Confirm requires full payment\n\n"
+        "- Cannot modify Order with status COMPLETED\n"
+        "- Order with status CREATED can transition to CONFIRMED only if fully paid\n\n"
     )
 )
 class OrderSerializer(serializers.ModelSerializer):
@@ -125,10 +125,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
 @extend_schema_serializer(
     description=(
         "Payment invariants:\n"
-        "- Currency must match Order.currency\n"
+        "- Payment currency must match currency of the associated Order\n"
         "- Unique per provider + idempotency_key\n"
-        "- Cannot modify payment in terminal state\n"
-        "- Cannot create payment for cancelled order\n\n"
+        "- Cannot modify Payment with terminal status FAILED or REFUNDED\n"
+        "- Cannot create Payment for Order with status CANCELLED\n\n"
     )
 )
 class PaymentSerializer(serializers.ModelSerializer):

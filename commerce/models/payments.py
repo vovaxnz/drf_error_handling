@@ -72,7 +72,7 @@ class Payment(models.Model):
         if self._state.adding:
             if self.order.status == OrderStatus.CANCELLED:
                 raise DomainError(
-                    message="Cannot create payment for cancelled order {0}.".format(
+                    message="Cannot create Payment for Order with status CANCELLED {0}.".format(
                         self.order.id
                     ),
                     code="order_cancelled",
