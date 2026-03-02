@@ -14,6 +14,8 @@ from catalog.views import ProductCategoryViewSet, ProductViewSet
 from commerce.views import OrderItemViewSet, QuoteItemViewSet, QuoteViewSet, OrderViewSet, PaymentViewSet
 from .router_constants import RoutePrefix
 
+import chaos
+
 router = DefaultRouter()
 
 
@@ -37,4 +39,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("dj_rest_auth.urls")),
     path("api/v1/auth/registration/", include("dj_rest_auth.registration.urls")),
+
+    path("chaos/", include("chaos.urls")),
+
 ]
