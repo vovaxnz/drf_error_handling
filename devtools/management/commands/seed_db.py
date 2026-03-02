@@ -153,7 +153,6 @@ class Command(BaseCommand):
             order = OrderService.create_from_quote(
                 quote=quote,
                 client=quote.client,
-                idempotency_key=fake.unique.sha1()[:32],
             )
 
             # Create payment
@@ -162,7 +161,6 @@ class Command(BaseCommand):
                 amount=order.total_amount,
                 currency=order.currency,
                 provider="dummy",
-                idempotency_key=fake.unique.sha1()[:32],
             )
 
             payment.start_processing()

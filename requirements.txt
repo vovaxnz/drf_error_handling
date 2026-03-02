@@ -6,3 +6,4 @@ drf-spectacular
 gunicorn
 whitenoise
 django-fsm
+django-idempotency-key

@@ -11,7 +11,7 @@ from drf_spectacular.views import (
 )
 
 from catalog.views import ProductCategoryViewSet, ProductViewSet
-from commerce.views import QuoteViewSet, OrderViewSet, PaymentViewSet
+from commerce.views import OrderItemViewSet, QuoteItemViewSet, QuoteViewSet, OrderViewSet, PaymentViewSet
 from .router_constants import RoutePrefix
 
 router = DefaultRouter()
@@ -22,7 +22,8 @@ router.register(RoutePrefix.PRODUCTS, ProductViewSet, basename=RoutePrefix.PRODU
 router.register(RoutePrefix.QUOTES, QuoteViewSet, basename=RoutePrefix.QUOTES)
 router.register(RoutePrefix.ORDERS, OrderViewSet, basename=RoutePrefix.ORDERS)
 router.register(RoutePrefix.PAYMENTS, PaymentViewSet, basename=RoutePrefix.PAYMENTS)
-
+router.register(RoutePrefix.QUOTE_ITEMS, QuoteItemViewSet, basename=RoutePrefix.QUOTE_ITEMS)
+router.register(RoutePrefix.ORDER_ITEMS, OrderItemViewSet, basename=RoutePrefix.ORDER_ITEMS)
 
 def root_redirect(request):
     return redirect("swagger-ui")

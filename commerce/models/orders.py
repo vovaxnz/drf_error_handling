@@ -27,9 +27,6 @@ TERMINAL_STATUSES = {
 }
 
 class Order(models.Model):
-    """
-    Create transactionally and idempotently (idempotency_key is unique within the client).
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders")
@@ -45,15 +42,11 @@ class Order(models.Model):
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))], default=Decimal("0"))
 
     shipping_address = models.JSONField(default=dict, blank=True)
-    idempotency_key = models.CharField(max_length=64)
 
     placed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["client", "idempotency_key"], name="uniq_order_client_idempotency_key"),
-        ]
         indexes = [
             models.Index(fields=["client", "created_at"]),
             models.Index(fields=["status"]),

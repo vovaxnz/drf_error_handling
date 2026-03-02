@@ -47,9 +47,9 @@ class PaymentInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ("id", "client", "status", "currency", "total_amount", "idempotency_key", "placed_at", "created_at")
+    list_display = ("id", "client", "status", "currency", "total_amount",  "placed_at", "created_at")
     list_filter = ("status", "currency")
-    search_fields = ("id", "client__email", "client__username", "idempotency_key", "quote__id")
+    search_fields = ("id", "client__email", "client__username", "quote__id")
     autocomplete_fields = ("client", "quote")
     readonly_fields = ("status", "total_amount", "placed_at", "created_at")
     inlines = (OrderItemInline, PaymentInline)
@@ -68,6 +68,6 @@ class OrderItemAdmin(admin.ModelAdmin):
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ("id", "order", "status", "amount", "currency", "provider", "provider_reference", "paid_at", "created_at")
     list_filter = ("status", "currency", "provider")
-    search_fields = ("id", "order__id", "provider_reference", "idempotency_key")
+    search_fields = ("id", "order__id", "provider_reference")
     autocomplete_fields = ("order",)
     readonly_fields = ("status", "provider_reference", "paid_at", "created_at")

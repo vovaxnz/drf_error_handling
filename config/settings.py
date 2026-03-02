@@ -24,9 +24,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ["SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
+
+# PATCH: To make it possible work witn django-idempotency-key without https
+from django.http import HttpRequest
+if DEBUG:
+    HttpRequest.is_secure = lambda self: True
 
 
 # Application definition
@@ -53,6 +58,8 @@ INSTALLED_APPS = [
 
     "drf_spectacular",
 
+    "idempotency_key",
+
     "accounts",
     "catalog",
     "commerce",
@@ -75,8 +82,6 @@ REST_FRAMEWORK = {
 
 }
 
-# REST_USE_JWT = True
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -86,6 +91,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # "idempotency_key.middleware.IdempotencyKeyMiddleware", # Throws 400 when we use http. Enforces all endpoints use idempotency key
+    'idempotency_key.middleware.ExemptIdempotencyKeyMiddleware', # Ignores all endpoints except explicitly selected
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -190,4 +197,9 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+IDEMPOTENCY_KEY = {
+    "HEADER": "HTTP_IDEMPOTENCY_KEY",
+    "METHODS": ["POST"]
 }

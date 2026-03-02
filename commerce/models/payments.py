@@ -35,14 +35,9 @@ class Payment(models.Model):
 
     paid_at = models.DateTimeField(null=True, blank=True)
 
-    idempotency_key = models.CharField(max_length=64)
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["provider", "idempotency_key"], name="uniq_payment_provider_idem"),
-        ]
         indexes = [
             models.Index(fields=["order"]),
             models.Index(fields=["status"]),

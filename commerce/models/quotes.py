@@ -193,13 +193,11 @@ class Quote(models.Model):
         return total
     
 
-    def can_be_sent(self) -> bool:
+    def can_be_sent(self):
         total_price = self.get_total_price()
         if total_price == 0:
             raise DomainError(
-                message="Cannot send quote {0} because total amount is {1}. Quote must contain at least one item.".format(
-                    self.id, total_price
-                ),
+                message=f"Cannot send quote {self.id} because total amount is {total_price}.",
                 code="empty_quote",
                 http_status=400,
             )

@@ -22,7 +22,6 @@ from .models.payments import Payment
     )
 )
 class QuoteSerializer(serializers.ModelSerializer):
-    available_transitions = serializers.SerializerMethodField()
 
     class Meta:
         model = Quote
@@ -34,14 +33,12 @@ class QuoteSerializer(serializers.ModelSerializer):
             "total_amount",
             "created_at",
             "updated_at",
-            "available_transitions",
         ]
         read_only_fields = [
             "id",
             "total_amount",
             "created_at",
             "updated_at",
-            "available_transitions",
         ]
 
 
@@ -65,14 +62,12 @@ class QuoteItemSerializer(serializers.ModelSerializer):
     description=(
         "Order invariants:\n"
         "- Created only from Quote with status ACCEPTED\n"
-        "- Idempotency key unique per client\n"
         "- Currency must match quote\n"
         "- Cannot modify Order with status COMPLETED\n"
         "- Order with status CREATED can transition to CONFIRMED only if fully paid\n\n"
     )
 )
 class OrderSerializer(serializers.ModelSerializer):
-    available_transitions = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -84,10 +79,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "currency",
             "total_amount",
             "shipping_address",
-            "idempotency_key",
             "placed_at",
             "created_at",
-            "available_transitions",
         ]
         read_only_fields = [
             "id",
@@ -95,14 +88,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "total_amount",
             "placed_at",
             "created_at",
-            "available_transitions",
         ]
 
-        extra_kwargs = {
-            "idempotency_key": {
-                "help_text": "Unique per client. Ensures idempotent creation."
-            }
-        }
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -126,13 +113,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
     description=(
         "Payment invariants:\n"
         "- Payment currency must match currency of the associated Order\n"
-        "- Unique per provider + idempotency_key\n"
         "- Cannot modify Payment with terminal status FAILED or REFUNDED\n"
         "- Cannot create Payment for Order with status CANCELLED\n\n"
     )
 )
 class PaymentSerializer(serializers.ModelSerializer):
-    available_transitions = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -145,9 +130,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             "provider",
             "provider_reference",
             "paid_at",
-            "idempotency_key",
             "created_at",
-            "available_transitions",
         ]
         read_only_fields = [
             "id",
@@ -155,14 +138,10 @@ class PaymentSerializer(serializers.ModelSerializer):
             "provider_reference",
             "paid_at",
             "created_at",
-            "available_transitions",
         ]
 
         extra_kwargs = {
             "currency": {
                 "help_text": "Must match order currency."
             },
-            "idempotency_key": {
-                "help_text": "Unique per provider."
-            }
         }

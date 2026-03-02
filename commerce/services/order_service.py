@@ -9,7 +9,7 @@ class OrderService:
 
     @staticmethod
     @transaction.atomic
-    def create_from_quote(*, quote: Quote, client, idempotency_key: str) -> Order:
+    def create_from_quote(*, quote: Quote, client) -> Order:
 
         quote = Quote.objects.select_for_update().get(pk=quote.pk)
 
@@ -36,7 +36,6 @@ class OrderService:
             quote=quote,
             currency=quote.currency,
             total_amount=quote.get_total_price(),
-            idempotency_key=idempotency_key,
         )
 
         items = [

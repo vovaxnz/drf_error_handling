@@ -7,6 +7,8 @@ from .models.payments import Payment
 from common.serializers import ErrorSerializer, crud_schema
 from .models.quotes import QuoteItem
 from .serializers import (
+    OrderItemSerializer,
+    QuoteItemSerializer,
     QuoteSerializer,
     OrderSerializer,
     PaymentSerializer,
@@ -17,6 +19,13 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema_view, extend_sc
 from .models.quotes import Quote
 from .models.orders import Order
 from .models.payments import Payment
+
+from rest_framework import status
+from commerce.services.order_service import OrderService
+
+from idempotency_key.decorators import idempotency_key
+from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -62,9 +71,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
             "Transition sent -> accepted and create Order.\n\n"
             "Invariants:\n"
             "- Quote must be in SENT state.\n"
-            "- idempotency_key is required.\n"
             "- Quote must contain at least one item.\n"
-            "- Order idempotency key must be unique per client.\n"
         ),
         responses={
             201: OpenApiResponse(description="Quote accepted and Order created"),
@@ -82,14 +89,10 @@ class QuoteViewSet(viewsets.ModelViewSet):
         quote.accept()
         quote.save()
 
-        idempotency_key = request.data.get("idempotency_key")
-        if not idempotency_key:
-            raise DomainError("idempotency_key is required")
 
         order = OrderService.create_from_quote(
             quote=quote,
             client=quote.client,
-            idempotency_key=idempotency_key,
         )
 
         return Response(
@@ -121,6 +124,20 @@ class QuoteViewSet(viewsets.ModelViewSet):
         quote.save()
         return Response(self.get_serializer(quote).data)
 
+    @action(detail=True, methods=["post"])
+    def add_item(self, request, pk=None):
+        quote = self.get_object()
+        product_id = request.data["product"]
+        quantity = int(request.data["quantity"])
+
+        product = Product.objects.get(pk=product_id)
+        quote.add_item(product, quantity)
+
+        return Response(self.get_serializer(quote).data)
+
+class QuoteItemViewSet(viewsets.ModelViewSet):
+    queryset = QuoteItem.objects.select_related("quote", "product")
+    serializer_class = QuoteItemSerializer
 
 
 @extend_schema_view(
@@ -251,6 +268,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(order).data)
 
 
+class OrderItemViewSet(viewsets.ModelViewSet):
+    queryset = OrderItem.objects.select_related("quote", "product")
+    serializer_class = OrderItemSerializer
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -274,10 +295,43 @@ class PaymentViewSet(viewsets.ModelViewSet):
     @extend_schema(
         description=(
             "Create payment record.\n\n"
+            "Idempotency:\n"
+            "- Requires Idempotency-Key header.\n"
+            "- Reusing the same key returns HTTP 409 and replays the original response body.\n\n"
             "Invariants:\n"
             "- Order must not be CANCELLED.\n"
             "- Payment currency must match order currency.\n"
-            "- Provider + idempotency_key must be unique.\n"
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="Idempotency-Key",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.HEADER,
+                required=True,
+                description="Unique key used to guarantee idempotent POST requests."
+            ),
+        ],
+        responses={
+            201: PaymentSerializer,
+            409: OpenApiResponse(
+                response=PaymentSerializer,
+                description="Returned when the same Idempotency-Key was already used. Contains the original Payment representation."
+            ),
+            400: ErrorSerializer,
+            401: ErrorSerializer,
+            403: ErrorSerializer,
+        },
+    )
+    @idempotency_key(optional=False)
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @extend_schema(
+        description=(
+            "Create payment record.\n\n"
+            "Invariants:\n"
+            "- Order must not be CANCELLED.\n"
+            "- Payment currency must match order currency.\n"
         ),
         responses={
             200: PaymentSerializer,
