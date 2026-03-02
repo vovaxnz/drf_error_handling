@@ -87,12 +87,18 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+
+    # ETag / If-None-Match support
+    "django.middleware.http.ConditionalGetMiddleware",
+
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+
     # "idempotency_key.middleware.IdempotencyKeyMiddleware", # Throws 400 when we use http. Enforces all endpoints use idempotency key
     'idempotency_key.middleware.ExemptIdempotencyKeyMiddleware', # Ignores all endpoints except explicitly selected
+
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -174,11 +180,49 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Simple Commerce API",
-    "DESCRIPTION": "",
+    "DESCRIPTION": (
+        "API Conventions\n\n"
+
+        "Authentication\n"
+        "- All endpoints require JWT authentication.\n"
+        "- Send Authorization: Bearer <access_token> header.\n\n"
+
+        "Idempotency\n"
+        "- All POST endpoints that create resources may require Idempotency-Key header.\n"
+        "- Idempotency-Key must be a unique client-generated string (typically UUID).\n"
+        "- Reusing the same Idempotency-Key with the same request body will NOT create a new resource.\n"
+        "- The server returns HTTP 409 Conflict and replays the original response body.\n"
+        "- 409 in this context does NOT represent a domain error.\n\n"
+
+        "HTTP Conditional Requests\n"
+        "- All GET endpoints support ETag-based conditional requests.\n"
+        "- Responses include ETag header.\n"
+        "- Clients may send If-None-Match header.\n"
+        "- If ETag matches, server returns 304 Not Modified with empty body.\n\n"
+
+        "State Machines\n"
+        "- Orders, Quotes and Payments use explicit state machines.\n"
+        "- Invalid transitions result in 400 or 409 depending on violation type.\n"
+        "- Terminal states prevent further modifications.\n\n"
+
+        "Domain Invariants\n"
+        "- Currency must match between related aggregates.\n"
+        "- Payments cannot be created for cancelled orders.\n"
+        "- Terminal entities cannot be modified.\n"
+
+        "Error Semantics\n"
+        "- 400: Validation or domain rule violation.\n"
+        "- 401: Authentication required or invalid token.\n"
+        "- 403: Permission denied.\n"
+        "- 404: Resource not found.\n"
+        "- 409: Conflict (idempotency replay or state conflict).\n"
+        "- 412: Precondition failed (if optimistic locking is used in future).\n\n"
+
+    ),
     "VERSION": "0.1.0",
     # optionally, if you want Swagger to display Bearer/JWT more conveniently
     "SERVE_INCLUDE_SCHEMA": False,
-
+    "TITLE": "Simple Commerce API",
 }
 
 from datetime import timedelta

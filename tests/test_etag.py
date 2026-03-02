@@ -61,72 +61,35 @@ def create_product(client, category_id):
     assert resp.status_code == 201
     return resp.json()["id"]
 
-
-def test_idempotent_payment_creation():
+def test_product_etag_conditional_get():
     client = APIClient()
     client.login()
 
-    user_id = client.get("/auth/user/").json()["pk"]
-
-    # створюємо quote -> order
     category_id = create_category(client)
     product_id = create_product(client, category_id)
 
-    quote_resp = client.post("/quotes/", json={
-        "client": user_id,
-        "status": "draft",
-    })
-    quote_id = quote_resp.json()["id"]
+    resp1 = client.get(f"/products/{product_id}/")
+    assert resp1.status_code == 200, resp1.text
 
-    # якщо у вас є endpoint quote-items
-    client.post("/quote-items/", json={
-        "quote": quote_id,
-        "product": product_id,
-        "quantity": 1,
-        "unit_price": "50.00",
-        "currency": "USD",
-    })
+    etag = resp1.headers.get("ETag")
+    assert etag is not None, "ETag header missing in response"
 
-    client.post(f"/quotes/{quote_id}/send/")
-    accept_resp = client.post(f"/quotes/{quote_id}/accept/")
-    order_id = accept_resp.json()["order_id"]
-
-    idempotency_key = str(uuid.uuid4())
-
-    payload = {
-        "order": order_id,
-        "amount": "50.00",
-        "currency": "USD",
-        "provider": "dummy",
-    }
-
-    # перший виклик
-    resp1 = client.post(
-        "/payments/",
-        json=payload,
-        idempotency_key=idempotency_key,
-    )
-    assert resp1.status_code == 201, resp1.text
-    payment_id_1 = resp1.json()["id"]
-
-    # другий виклик з тим самим ключем
-    resp2 = client.post(
-        "/payments/",
-        json=payload,
-        idempotency_key=idempotency_key,
+    resp2 = client.session.get(
+        f"{BASE_URL}/products/{product_id}/",
+        headers={
+            "If-None-Match": etag,
+        },
     )
 
-    # очікувана поведінка:
-    # або 200 з тим самим payment id
-    # або 409 conflict
-    assert resp2.status_code in (200, 201, 409), resp2.text
+    assert resp2.status_code == 304, resp2.text
 
-    if resp2.status_code in (200, 201):
-        payment_id_2 = resp2.json()["id"]
-        assert payment_id_1 == payment_id_2, "Idempotency failed: different resource created"
+    print(resp2.status_code)
+    assert resp2.text == "" or resp2.content == b"", "304 response must not contain body"
+
+    print("ETag conditional GET test passed")
 
 
 
 if __name__ == "__main__":
-    test_idempotent_payment_creation()
-    print("Idempotency test passed")
+    test_product_etag_conditional_get()
+    print("etag test passed")
